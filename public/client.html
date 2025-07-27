@@ -248,7 +248,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
       // Initialize socket connection
-      const socket = io();
+      const socket = io('https://crypto-crash-game-k0oq.onrender.com');
       let currentMultiplier = 1;
       let currentRoundId = "";
       let betPlaced = false;
@@ -374,7 +374,8 @@
 
         logDebug(`Fetching wallet for player ${pid}`);
         
-        fetch(`/api/wallet/${pid}`)
+        fetch(`https://crypto-crash-game-k0oq.onrender.com/api/wallet/${pid}`)
+
           .then((res) => {
             if (!res.ok) {
               throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -529,7 +530,7 @@
         logDebug(`🎰 Attempting to place bet: ${usdAmount} ${currency} for player ${playerId}`);
 
         try {
-          const response = await fetch("/api/game/bet", {
+          const response = await fetch("https://crypto-crash-game-k0oq.onrender.com/api/game/bet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -599,7 +600,7 @@
         logDebug(`💸 Attempting to cash out at ${currentMultiplier}x`);
 
         try {
-          const response = await fetch("/api/game/cashout", {
+          const response = await fetch("https://crypto-crash-game-k0oq.onrender.com/api/game/cashout", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
