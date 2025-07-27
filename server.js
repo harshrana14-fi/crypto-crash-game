@@ -3,9 +3,6 @@ const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const mongoose = require('./config/db');
-const gameRoutes = require('./routes/game');
-const walletRoutes = require('./routes/wallet');
-const playerRoutes = require('./routes/player');
 const generateCrashPoint = require('./utils/fairCrash');
 const GameRound = require('./models/GameRound');
 const crypto = require('crypto');
@@ -17,10 +14,20 @@ const io = socketIO(server);
 
 // Middleware
 app.use(express.json());
-app.use('/api/game', gameRoutes);
+app.use(express.static('public')); // For serving client.html
+
+// ✅ Import routes AFTER io is created
+const gameRoutes = require('./routes/game');
+const walletRoutes = require('./routes/wallet');
+const playerRoutes = require('./routes/player');
+
+// ✅ Pass io to routes that need it
+app.use('/api/game', (req, res, next) => {
+  req.io = io;
+  next();
+}, gameRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/players', playerRoutes);
-app.use(express.static('public')); // WebSocket test client
 
 // WebSocket setup
 io.on('connection', (socket) => {
@@ -79,8 +86,8 @@ function startNewRound() {
     console.log(`🎮 Round started ${salt} - crash at ${crashPoint}x`);
     io.emit('roundStarted', {
       roundId: salt,
-      crashPoint,
-      startTime: new Date()
+      seed: fairness.seed,
+      salt: fairness.salt
     });
 
     multiplierInterval = setInterval(() => {
@@ -104,15 +111,17 @@ function startNewRound() {
           hash: fairness.hash
         });
 
-        setTimeout(startNewRound, 10000); // 10s before next round
+        setTimeout(startNewRound, 10000); // Wait 10s before next round
       }
-    }, 100); // Update every 100ms
+    }, 100); // Multiplier increases every 100ms
   }, 10000); // 10s betting phase
 }
-
 
 // Start the first round after 3s
 setTimeout(startNewRound, 3000);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+// ✅ Export io for use in controllers
+module.exports = { app, server, io };

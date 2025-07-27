@@ -1,23 +1,19 @@
 // utils/fairCrash.js
 const crypto = require('crypto');
 
-function hashToFloat(seed, salt) {
+module.exports = function generateCrashPoint(seed, salt) {
   const hash = crypto.createHash('sha256').update(seed + salt).digest('hex');
-  const intValue = parseInt(hash.slice(0, 13), 16);
-  const float = intValue / 0xFFFFFFFFFFFFF;
-  return { float, hash };
-}
-
-function generateCrashRound(seed, salt) {
-  const { float: r, hash } = hashToFloat(seed, salt);
-  const crash = r >= 1 ? 1.0 : Math.min(Math.floor(100 * (1 / (1 - r))) / 100, 100);
+  
+  // Convert first 8 chars of hash to number
+  const hashNum = parseInt(hash.substring(0, 8), 16);
+  
+  // Generate crash point between 1.01x and 50x
+  const crashPoint = Math.max(1.01, (hashNum % 4900) / 100 + 1.01);
   
   return {
-    crashPoint: crash,
-    hash,
+    crashPoint: Math.round(crashPoint * 100) / 100,
     seed,
-    salt
+    salt,
+    hash
   };
-}
-
-module.exports = generateCrashRound;
+};

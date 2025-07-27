@@ -1,3 +1,6 @@
-// mockTxHash.js
+// utils/mockTxHash.js
 const crypto = require('crypto');
-module.exports = () => crypto.randomBytes(8).toString('hex');
+
+module.exports = function mockTxHash() {
+  return crypto.randomBytes(32).toString('hex');
+};

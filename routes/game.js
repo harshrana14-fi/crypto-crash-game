@@ -1,9 +1,10 @@
+
 // routes/game.js
 const express = require('express');
 const router = express.Router();
-const { placeBet, cashOut } = require('../controllers/gameController');
+const gameController = require('../controllers/gameController');
 
-router.post('/bet', placeBet);        // POST /api/game/bet
-router.post('/cashout', cashOut);     // POST /api/game/cashout
+router.post('/bet', gameController.placeBet);
+router.post('/cashout', gameController.cashOut);
 
 module.exports = router;
