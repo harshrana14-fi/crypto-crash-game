@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
@@ -14,7 +13,12 @@ const io = socketIO(server);
 
 // Middleware
 app.use(express.json());
-app.use(express.static('public')); // For serving client.html
+app.use(express.static('public')); // Serve static files, including client.html
+
+// Root route to serve client.html (if you want to display it on the root URL)
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/client.html');  // Ensure client.html is in the public folder
+});
 
 // ✅ Import routes AFTER io is created
 const gameRoutes = require('./routes/game');
