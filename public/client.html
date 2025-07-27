@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crypto Crash Game</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: #0d1117;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      text-align: center;
+      padding: 2rem;
+      background: #161b22;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 0 20px rgba(0, 255, 100, 0.1);
+    }
+
+    h1 { color: #58a6ff; }
+    #multiplier { font-size: 3rem; color: #0f0; margin: 1.5rem 0; }
+    #statusMessage { margin-top: 10px; color: #facc15; font-size: 1.1rem; }
+
+    .bet-panel input, .bet-panel select, .bet-panel button {
+      margin: 5px;
+      padding: 10px;
+      font-size: 1rem;
+    }
+
+    #cashoutBtn {
+      padding: 10px 20px;
+      margin-top: 1rem;
+      background: #ff3838;
+      border: none;
+      font-size: 1.1rem;
+      color: white;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    .wallet, .history, .fair {
+      margin-top: 1rem;
+    }
+
+    .active-bets table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      color: #eee;
+    }
+
+    .active-bets th, .active-bets td {
+      padding: 8px;
+      border: 1px solid #444;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Crypto Crash Game</h1>
+    <div id="multiplier">1.00x</div>
+    <div id="statusMessage">⏳ Waiting for the next round...</div>
+
+    <div class="bet-panel">
+      <select id="playerId">
+        <option value="6885fa4a75debd33e2dd7000">Alice</option>
+        <option value="6885fa4a75debd33e2dd7001">Bob</option>
+      </select>
+      <input type="number" id="betAmount" placeholder="💵 USD" />
+      <select id="currency">
+        <option value="BTC">BTC</option>
+        <option value="ETH">ETH</option>
+      </select>
+      <button onclick="placeBet()">🎰 Place Bet</button>
+    </div>
+
+    <div class="wallet"><strong>Wallet:</strong> <span id="wallet">Loading...</span></div>
+    <button id="cashoutBtn" disabled onclick="cashOut()">💸 Cash Out</button>
+
+    <div class="active-bets">
+      <h3>📊 Active Bets</h3>
+      <table><thead><tr><th>Player</th><th>USD</th><th>Crypto</th><th>Cashout</th></tr></thead>
+        <tbody id="betsTable"></tbody>
+      </table>
+    </div>
+
+    <div class="history">
+      <h3>📜 Crash History</h3>
+      <div id="historyList"></div>
+    </div>
+
+    <div class="fair">
+      <h4>🔐 Provably Fair</h4>
+      <div id="fairInfo">Seed: — | Salt: —</div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let currentMultiplier = 1;
+    let crashPoint = null;
+    let betPlaced = false;
+    let currentRoundId = "";
+    let isBettingOpen = false;
+
+    const multiplierDisplay = document.getElementById("multiplier");
+    const cashoutBtn = document.getElementById("cashoutBtn");
+    const historyList = document.getElementById("historyList");
+    const betsTable = document.getElementById("betsTable");
+    const fairInfo = document.getElementById("fairInfo");
+    const statusMessage = document.getElementById("statusMessage");
+
+    const playerIdInput = document.getElementById("playerId");
+    const currencySelect = document.getElementById("currency");
+
+    window.onload = () => updateWallet();
+    playerIdInput.addEventListener("change", updateWallet);
+
+    socket.on("bettingPhaseStarted", (data) => {
+      console.log("🔔 Betting phase received");
+      currentRoundId = data.roundId;
+      isBettingOpen = true;
+      betPlaced = false;
+      statusMessage.textContent = "🟢 Place your bets! 10 seconds remaining...";
+    });
+
+    socket.on("roundStarted", (data) => {
+      crashPoint = data.crashPoint;
+      currentRoundId = data.roundId;
+      isBettingOpen = false;
+      currentMultiplier = 1.0;
+      multiplierDisplay.textContent = "1.00x";
+      betPlaced = false;
+      cashoutBtn.disabled = true;
+      betsTable.innerHTML = "";
+
+      fairInfo.innerText = `Seed: ${data.provablyFair.seed} | Salt: ${data.provablyFair.salt} | Crash @ ${data.crashPoint}`;
+      statusMessage.textContent = "🚀 Round started! Bets are closed.";
+    });
+
+    socket.on("multiplierUpdate", (data) => {
+      currentMultiplier = parseFloat(data.multiplier);
+      multiplierDisplay.textContent = `${currentMultiplier.toFixed(2)}x`;
+      multiplierDisplay.style.color = currentMultiplier > 2 ? "#facc15" : "#0f0";
+      if (betPlaced) cashoutBtn.disabled = false;
+    });
+
+    socket.on("playerCashout", (data) => {
+      const row = document.querySelector(`#bet-${data.playerId}`);
+      if (row) row.children[3].innerText = `${data.multiplier}x 💰`;
+    });
+
+    socket.on("roundEnd", (data) => {
+      cashoutBtn.disabled = true;
+      historyList.innerHTML = `<div>💥 Crashed at ${data.crashPoint}x</div>` + historyList.innerHTML;
+      statusMessage.textContent = "⏳ Waiting for next round...";
+    });
+
+    async function updateWallet() {
+      const playerId = playerIdInput.value;
+      if (!playerId) return;
+      try {
+        const res = await fetch(`/api/wallet/${playerId}`);
+        const data = await res.json();
+        const currency = currencySelect.value;
+        document.getElementById("wallet").innerText = `${data.crypto[currency]} ${currency} ($${data.usdEquivalent[currency]})`;
+      } catch {
+        document.getElementById("wallet").innerText = "N/A";
+      }
+    }
+
+    async function placeBet() {
+      const playerId = playerIdInput.value;
+      const usdAmount = document.getElementById("betAmount").value;
+      const currency = currencySelect.value;
+
+      if (!currentRoundId || !isBettingOpen) {
+        alert("⏳ You can only place bets during the 10-second betting phase.");
+        return;
+      }
+
+      if (!playerId || !usdAmount || usdAmount <= 0) {
+        alert("⚠️ Enter valid bet and player ID");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/game/bet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId, usdAmount, currency, roundId: currentRoundId }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        betPlaced = true;
+        updateWallet();
+        const newRow = `
+          <tr id="bet-${playerId}">
+            <td>${playerId.slice(-4)}</td>
+            <td>$${usdAmount}</td>
+            <td>${data.cryptoAmount} ${currency}</td>
+            <td>—</td>
+          </tr>`;
+        betsTable.innerHTML += newRow;
+      } catch (err) {
+        alert("❌ Bet Failed: " + err.message);
+      }
+    }
+
+    async function cashOut() {
+      const playerId = playerIdInput.value;
+      try {
+        const res = await fetch("/api/game/cashout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId, roundId: currentRoundId, currentMultiplier }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        updateWallet();
+        alert(`✅ Cashed out ${data.cryptoPayout} | $${data.usdEquivalent}`);
+        cashoutBtn.disabled = true;
+      } catch (err) {
+        alert("❌ Cashout failed: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
