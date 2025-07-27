@@ -15,9 +15,9 @@ const io = socketIO(server);
 app.use(express.json());
 app.use(express.static('public')); // Serve static files, including client.html
 
-// Root route to serve client.html (if you want to display it on the root URL)
+
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/client.html');  // Ensure client.html is in the public folder
+  res.sendFile(__dirname + '/public/index.html');  // Ensure client.html is in the public folder
 });
 
 // ✅ Import routes AFTER io is created
